@@ -2,12 +2,14 @@ from datetime import UTC, datetime, timedelta
 from io import BytesIO
 import math
 import tarfile
+import re
 
 import numpy as np
 import requests
 import logging
+import h5py
 
-API_URL = "https://opendata.dwd.de/weather/radar/composite/rv/DE1200_RV_LATEST.tar.bz2"
+API_URL = "https://opendata.dwd.de/weather/radar/composite/rv/composite_rv_LATEST.tar"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,17 +35,18 @@ class DWDRadar:
         _LOGGER.info(r)
         tar = tarfile.open(fileobj=BytesIO(r.content))
         _LOGGER.info(tar)
-
         for tarmember in tar.getmembers():
-            radar_minute_delta = int(tarmember.name[-3:])
-            radar_time = datetime.strptime(
-                tarmember.name[-14:-4], "%y%m%d%H%M"
-            ).replace(tzinfo=UTC) + timedelta(minutes=radar_minute_delta)
+            m = re.search(r"(\d{3})-hd5", tarmember.name)
+            radar_minute_delta = int(m.group(1))
+            m = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})", tarmember.name)
+            radar_time = datetime(year=int(m.group(1)), month=int(m.group(2)), day=int(m.group(3)), hour=int(m.group(4)), minute=int(m.group(5))).replace(tzinfo=UTC) + timedelta(minutes=radar_minute_delta)
             f = tar.extractfile(tarmember)
-            content = f.read().split(b"\x03", 1)[1]
-            radars[radar_time] = np.frombuffer(content, dtype="uint16").reshape(
-                self.ysize, self.xsize
-            )
+            #radars[radar_time] = np.frombuffer(content, dtype="uint16").reshape(
+            #    self.ysize, self.xsize)
+            hdf = h5py.File(f, 'r')
+
+            radars[radar_time] = hdf['dataset1']['data1']['data'][:]
+            hdf.close()
         self.radars = radars
         _LOGGER.info("got radars")
 
@@ -58,7 +61,7 @@ class DWDRadar:
             * math.sin((y - 10) / 180 * math.pi)
             + 543.4622
         )
-        y_cart = int(
+        y_cart = self.ysize - int(
             -6370.04
             * (1 + math.sin(60 / 180 * math.pi))
             / (1 + math.sin(x / 180 * math.pi))
@@ -77,12 +80,7 @@ class DWDRadar:
         values = {}
         for radar_time, radar in self.radars.items():
             value_raw = radar[y_cart][x_cart]
-            value = (
-                value_raw & 0b0000111111111111
-                if not (value_raw & 0b0010000000000000)
-                else 0
-            )
-            values[radar_time] = float(value) / 100 * 12
+            values[radar_time] = int(value_raw) / 1000 * 12
         return values
 
     def get_value(self, x, y, search_time: datetime):
