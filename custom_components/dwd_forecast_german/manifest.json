@@ -1,5 +1,5 @@
 {
-  "domain": "dwd_precipitation_forecast",
+  "domain": "dwd_forecast_german",
   "name": "DWD Niederschlagsvorhersage",
   "codeowners": [
     "@soundclub83"
@@ -16,9 +16,9 @@
     "pyproj~=3.8.0"
   ],
   "ssdp": [],
-  "version": "0.3.0",
+  "version": "1.0.0",
   "zeroconf": [],
   "loggers": [
-    "custom_components.dwd_precipitation_forecast"
+    "custom_components.dwd_forecast_german"
   ]
 }

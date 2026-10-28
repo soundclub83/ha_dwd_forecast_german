@@ -15,7 +15,7 @@ Die vorhandene Integration liefert für einen Standort innerhalb des deutschen D
 
 Die Integration ruft die RV-Radardaten alle fünf Minuten ab. Datenbereitstellung und Übertragung können zu zeitlichem Versatz führen. Die Daten sind räumliche Radarschätzungen und keine Messung unmittelbar am Haus.
 
-Ab Version **0.3.0** sind Einrichtung, Standardnamen und neue Zustände deutschsprachig. Bestehende Entitäts-IDs und eindeutige Kennungen bleiben erhalten. Eigene Namen in Home Assistant werden nicht überschrieben. RV liefert Niederschlagsmengen; die aktuelle Niederschlagsart kommt separat aus HymecNG.
+Ab Version **1.0.0** sind Einrichtung, Standardnamen und neue Zustände deutschsprachig. Der Fork verwendet eine eigene Integrationskennung und eigene Entitäten. Die bisherige Integration wird nicht ersetzt. RV liefert Niederschlagsmengen; die aktuelle Niederschlagsart kommt separat aus HymecNG.
 
 ## Aktuelle Niederschlagsart (HymecNG)
 
@@ -27,13 +27,13 @@ Der Sensor enthält den Datenstand, den normalisierten Klassencode und die Kennz
 
 Installationshinweise, Dashboard-Beispiel und Lizenzhinweise stehen in der [README](https://github.com/soundclub83/ha_dwd_forecast_german/blob/main/README.md).
 
-## Technische Änderungen in 0.3.0
+## Technische Änderungen in 1.0.0
 
 - DWD-HDF5-Projektion statt der alten sphärischen Standortformel; dadurch kann die gewählte Rasterzelle gegenüber dem Original abweichen.
 - Skalierung und Offset aus dem RV-Dateiheader; fehlende Werte werden nicht als Niederschlag ausgegeben.
 - Prüfung vollständiger RV-Zeitreihen und veralteter Daten; HTTP-Zeitlimits.
 - Zusätzliche Abhängigkeit `pyproj` zur Koordinatenumrechnung. Die erforderlichen Pakete werden von Home Assistant installiert; ein Neustart ist nach dem Austausch notwendig.
-- Die bestehenden Prognoseattribute und die Zustände der 15-/30-/60-Minuten-Sensoren bleiben für bestehende Dashboards kompatibel.
+- Die Struktur der Prognoseattribute und die Zustände der 15-/30-/60-Minuten-Sensoren entsprechen dem Original. Wegen der getrennten Integration müssen Karten und Automationen für den Fork ausdrücklich auf dessen neue Entitäten eingestellt werden.
 
 ## Herkunft und Lizenzen
 

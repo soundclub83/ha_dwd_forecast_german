@@ -59,21 +59,21 @@ def modules(monkeypatch):
     module("homeassistant.config_entries", ConfigEntry=Generic)
     module("async_timeout", timeout=asyncio.timeout)
     for name in ["coordinator", "sensor"]:
-        monkeypatch.delitem(sys.modules, "custom_components.dwd_precipitation_forecast." + name, raising=False)
-    return (importlib.import_module("custom_components.dwd_precipitation_forecast.sensor"),
-            importlib.import_module("custom_components.dwd_precipitation_forecast.coordinator"))
+        monkeypatch.delitem(sys.modules, "custom_components.dwd_forecast_german." + name, raising=False)
+    return (importlib.import_module("custom_components.dwd_forecast_german.sensor"),
+            importlib.import_module("custom_components.dwd_forecast_german.coordinator"))
 
 
 def test_existing_unique_ids_and_attributes(modules):
     sensor, _ = modules
-    entry = types.SimpleNamespace(data={"latitude": 52.4, "longitude": 13.3}, title="Home")
+    entry = types.SimpleNamespace(data={"latitude": 48.0, "longitude": 8.0}, title="Home")
     api = Mock()
     api.get_next_precipitation.return_value = {"start": None, "end": None, "length": None, "max": 0, "sum": 0}
     api.get_precipitation_values.return_value = {}
     coordinator = types.SimpleNamespace(api=api, last_update_success=True)
     for description in sensor.SENSORS:
         entity = sensor.DwdPrecipitationForecastEntity(coordinator, entry, description)
-        assert entity._attr_unique_id == f"52.4-13.3--{description.key}"
+        assert entity._attr_unique_id == f"48.0-8.0--{description.key}"
         if description.key == "next":
             assert entity.native_value is None
             assert set(entity.extra_state_attributes) == {"end", "length", "max", "sum"}
@@ -90,7 +90,7 @@ def test_snow_sensor_freshness_failure_and_icon(modules):
     api.fresh.return_value = True
     api.timestamp = None
     coordinator = types.SimpleNamespace(api=api, last_update_success=True)
-    entry = types.SimpleNamespace(data={"latitude": 52.4, "longitude": 13.3}, title="Home")
+    entry = types.SimpleNamespace(data={"latitude": 48.0, "longitude": 8.0}, title="Home")
     entity = sensor.DwdPrecipitationTypeSensor(coordinator, entry)
     assert entity.native_value == "Schnee"
     assert entity.icon == "mdi:weather-snowy"

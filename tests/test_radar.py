@@ -10,8 +10,8 @@ import numpy as np
 from pyproj import Proj
 import pytest
 
-from custom_components.dwd_precipitation_forecast import dwdradar, hymec
-from custom_components.dwd_precipitation_forecast.radar_grid import NotInAreaError, RadarGrid
+from custom_components.dwd_forecast_german import dwdradar, hymec
+from custom_components.dwd_forecast_german.radar_grid import NotInAreaError, RadarGrid
 
 PROJECTION = "+proj=eqc +R=6371000 +units=m"
 STAMP = datetime(2026, 10, 28, 18, 45, tzinfo=UTC)
@@ -169,8 +169,8 @@ def test_legacy_event_attributes_remain():
 
 def test_metadata_and_german_fallback():
     root = Path(__file__).parents[1]
-    component = root / "custom_components/dwd_precipitation_forecast"
+    component = root / "custom_components/dwd_forecast_german"
     manifest = json.loads((component / "manifest.json").read_text())
-    assert manifest["domain"] == "dwd_precipitation_forecast"
-    assert manifest["version"] == "0.3.0"
+    assert manifest["domain"] == "dwd_forecast_german"
+    assert manifest["version"] == "1.0.0"
     assert json.loads((component / "strings.json").read_text()) == json.loads((component / "translations/de.json").read_text())

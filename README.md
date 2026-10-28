@@ -15,7 +15,7 @@ Die vorhandene Integration liefert für einen Standort innerhalb des deutschen D
 
 Die Integration ruft die RV-Radardaten alle fünf Minuten ab. Datenbereitstellung und Übertragung können zu zeitlichem Versatz führen. Die Daten sind räumliche Radarschätzungen und keine Messung unmittelbar am Haus.
 
-Ab Version **0.3.0** sind Einrichtung, Standardnamen und neue Zustände deutschsprachig. Bestehende Entitäts-IDs und eindeutige Kennungen bleiben erhalten. Eigene Namen in Home Assistant werden nicht überschrieben. RV liefert Niederschlagsmengen; die aktuelle Niederschlagsart kommt separat aus HymecNG.
+Ab Version **1.0.0** sind Einrichtung, Standardnamen und neue Zustände deutschsprachig. Der Fork verwendet eine eigene Integrationskennung und eigene Entitäten. Die bisherige Integration wird nicht ersetzt. RV liefert Niederschlagsmengen; die aktuelle Niederschlagsart kommt separat aus HymecNG.
 
 ## Aktuelle Niederschlagsart (HymecNG)
 
@@ -31,12 +31,12 @@ Der Fork wird nicht im HACS-Standardkatalog oder einem Marketplace veröffentlic
 
 ### Vorhandene Installation
 
-Der technische Integrationsname lautet weiterhin `dwd_precipitation_forecast`. Original und Fork können deshalb nicht parallel unter diesem Namen installiert werden. Vor einem Wechsel die bestehende Installation und die Home-Assistant-Konfiguration sichern. In HACS darf danach nicht das Original-Repository über diesen Fork aktualisiert werden. Ein Austausch sollte erst nach Prüfung des jeweiligen Entwicklungsstands erfolgen.
+Der Fork verwendet den eigenen technischen Integrationsnamen `dwd_forecast_german` und den eigenen Ordner `custom_components/dwd_forecast_german`. Original und Fork können parallel installiert werden. Der Originalordner `custom_components/dwd_precipitation_forecast` bleibt unverändert. Den Standort für den Fork separat über die Oberfläche einrichten; vorhandene Karten und Automationen wechseln nicht automatisch auf die neuen Entitäten.
 
 ### Manuelle Installation
 
 1. Den gewünschten Stand dieses Repositorys als ZIP herunterladen.
-2. Den Ordner `custom_components/dwd_precipitation_forecast` in den Ordner `custom_components` der Home-Assistant-Konfiguration kopieren.
+2. Den Ordner `custom_components/dwd_forecast_german` in den Ordner `custom_components` der Home-Assistant-Konfiguration kopieren.
 3. Home Assistant neu starten.
 4. Falls noch nicht eingerichtet: unter „Einstellungen → Geräte & Dienste“ die Integration „DWD Niederschlagsvorhersage“ hinzufügen und Standortname, Breitengrad und Längengrad eingeben.
 
@@ -59,7 +59,7 @@ Benötigte Komponenten:
 - [easy-time-jinja](https://github.com/Petro31/easy-time-jinja)
 - [card-mod](https://github.com/thomasloven/lovelace-card-mod)
 
-Die Entität `sensor.dwd_precipitation_forecast_leipzig` im Beispiel an beiden Stellen durch den eigenen Sensor ersetzen.
+Die Entität `sensor.dwd_forecast_german_leipzig` im Beispiel an beiden Stellen durch den eigenen Sensor ersetzen.
 
 ```yaml
 type: custom:mushroom-template-card
@@ -95,22 +95,22 @@ icon_color: |-
   {% else %}
   grey
   {% endif %}
-entity: sensor.dwd_precipitation_forecast_leipzig
+entity: sensor.dwd_forecast_german_leipzig
 card_mod:
   style: |
-    {% set entity = 'sensor.dwd_precipitation_forecast_leipzig' %}
+    {% set entity = 'sensor.dwd_forecast_german_leipzig' %}
     ha-card {
       background-image: linear-gradient(90deg{% set entity = entity %}{% set duration = state_attr(entity, 'forecast').keys() | last | as_timestamp - now() | as_timestamp %}{% set hue_min = 200 %}{% set hue_max = 300 %}{% set prec_max = 20 %}{% for x, y in state_attr(entity, 'forecast').items() %}{% set pos = ((x | as_timestamp - (now() | as_timestamp))/duration*100) | round %}{% set hsl_h = (y/prec_max*(hue_max-hue_min)+hue_min)|round %}{% set hsl_l = 50 if y > 0 else 100 %}{% set hsl_alpha = 0.5 if y > 0 else 0 %}{% if pos >= -4 %}, hsla({{hsl_h}}, 100%, {{hsl_l}}%, {{hsl_alpha}}) {{ max(pos,0) }}%{% endif %}{% endfor %});
     }
 ```
 
-## Technische Änderungen in 0.3.0
+## Technische Änderungen in 1.0.0
 
 - DWD-HDF5-Projektion statt der alten sphärischen Standortformel; dadurch kann die gewählte Rasterzelle gegenüber dem Original abweichen.
 - Skalierung und Offset aus dem RV-Dateiheader; fehlende Werte werden nicht als Niederschlag ausgegeben.
 - Prüfung vollständiger RV-Zeitreihen und veralteter Daten; HTTP-Zeitlimits.
 - Zusätzliche Abhängigkeit `pyproj` zur Koordinatenumrechnung. Die erforderlichen Pakete werden von Home Assistant installiert; ein Neustart ist nach dem Austausch notwendig.
-- Die bestehenden Prognoseattribute und die Zustände der 15-/30-/60-Minuten-Sensoren bleiben für bestehende Dashboards kompatibel.
+- Die Struktur der Prognoseattribute und die Zustände der 15-/30-/60-Minuten-Sensoren entsprechen dem Original. Wegen der getrennten Integration müssen Karten und Automationen für den Fork ausdrücklich auf dessen neue Entitäten eingestellt werden.
 
 ## Herkunft und Lizenzen
 
