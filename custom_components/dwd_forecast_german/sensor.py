@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
 
-from .const import DOMAIN
+from .const import ATTRIBUTION, DOMAIN
 from .coordinator import (
     DwdPrecipitationForecastConfigEntry,
     DwdPrecipitationForecastCoordinator,
@@ -77,7 +77,7 @@ async def async_setup_entry(
 class DwdPrecipitationForecastEntity(
     CoordinatorEntity[DwdPrecipitationForecastCoordinator], SensorEntity
 ):
-    _attr_attribution = "Datenquelle: Deutscher Wetterdienst (DWD), CC BY 4.0; für Home Assistant aufbereitet"
+    _attr_attribution = ATTRIBUTION
     _attr_has_entity_name = True
 
     def __init__(
@@ -216,7 +216,7 @@ class DwdPrecipitationTypeSensor(CoordinatorEntity, SensorEntity):
     _attr_name = "Niederschlagsart"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(PRECIPITATION_TYPES.values())
-    _attr_attribution = DwdPrecipitationForecastEntity._attr_attribution
+    _attr_attribution = ATTRIBUTION
     _attr_icon = "mdi:weather-partly-rainy"
 
     def __init__(self, coordinator, entry):

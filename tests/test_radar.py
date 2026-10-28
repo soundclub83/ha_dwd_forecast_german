@@ -172,5 +172,5 @@ def test_metadata_and_german_fallback():
     component = root / "custom_components/dwd_forecast_german"
     manifest = json.loads((component / "manifest.json").read_text())
     assert manifest["domain"] == "dwd_forecast_german"
-    assert manifest["version"] == "1.0.0"
+    assert manifest["version"] == "1.0.1"
     assert json.loads((component / "strings.json").read_text()) == json.loads((component / "translations/de.json").read_text())

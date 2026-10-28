@@ -35,6 +35,20 @@ def modules(monkeypatch):
         def __init__(self, hass, *args, **kwargs):
             self.hass = hass
 
+    class EntityMeta(type):
+        """Für diesen Fehler relevante HA-Regel: _attr_ wird zum Descriptor."""
+
+        def __new__(mcs, name, bases, namespace):
+            if "_attr_attribution" in namespace:
+                value = namespace["_attr_attribution"]
+                if isinstance(value, property):
+                    raise TypeError("Can't override _attr_attribution in subclass")
+                namespace["_attr_attribution"] = property(lambda self, value=value: value)
+            return super().__new__(mcs, name, bases, namespace)
+
+    class SensorEntity(metaclass=EntityMeta):
+        pass
+
     @dataclass(kw_only=True)
     class Description:
         key: str
@@ -45,7 +59,7 @@ def modules(monkeypatch):
 
     module("homeassistant")
     module("homeassistant.components")
-    module("homeassistant.components.sensor", SensorEntity=type("SensorEntity", (), {}),
+    module("homeassistant.components.sensor", SensorEntity=SensorEntity,
            SensorEntityDescription=Description,
            SensorDeviceClass=types.SimpleNamespace(PRECIPITATION_INTENSITY="precipitation_intensity", TIMESTAMP="timestamp", ENUM="enum"),
            SensorStateClass=types.SimpleNamespace(MEASUREMENT="measurement"))
@@ -93,6 +107,8 @@ def test_snow_sensor_freshness_failure_and_icon(modules):
     entry = types.SimpleNamespace(data={"latitude": 48.0, "longitude": 8.0}, title="Home")
     entity = sensor.DwdPrecipitationTypeSensor(coordinator, entry)
     assert entity.native_value == "Schnee"
+    assert isinstance(entity._attr_attribution, str)
+    assert "DWD" in entity._attr_attribution
     assert entity.icon == "mdi:weather-snowy"
     assert entity.extra_state_attributes["ist_vorhersage"] is False
     api.code_at.return_value = None
