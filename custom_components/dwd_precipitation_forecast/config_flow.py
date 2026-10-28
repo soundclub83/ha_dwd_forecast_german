@@ -17,25 +17,10 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate the user input allows us to connect.
-
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
-    # TODO validate the data can be used to set up a connection.
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data[CONF_USERNAME], data[CONF_PASSWORD]
-    # )
-
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
-
-    # Return info that you want to store in the config entry.
-    return {"title": data["name"]}
+    """Koordinaten und Standortnamen prüfen."""
+    if not data["name"].strip() or not (-90 <= data[CONF_LATITUDE] <= 90 and -180 <= data[CONF_LONGITUDE] <= 180):
+        raise ValueError("Ungültige Standortangaben")
+    return {"title": data["name"].strip()}
 
 
 class ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -51,8 +36,10 @@ class ConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
+            except ValueError:
+                errors["base"] = "invalid_coordinates"
             except Exception:
-                _LOGGER.exception("Unexpected exception")
+                _LOGGER.exception("Fehler bei der Einrichtung")
                 errors["base"] = "unknown"
             else:
                 return self.async_create_entry(title=info["title"], data=user_input)

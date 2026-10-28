@@ -21,7 +21,8 @@ from .coordinator import (
     DwdPrecipitationForecastConfigEntry,
     DwdPrecipitationForecastCoordinator,
 )
-from .dwdradar import NotInAreaError
+from .dwdradar import NotInAreaError, RadarNotAvailableError
+from .hymec import PRECIPITATION_TYPES
 
 
 @dataclass(kw_only=True)
@@ -41,20 +42,20 @@ SENSORS: tuple[DwdPrecipitationForecastEntityDescription, ...] = (
     ),
     DwdPrecipitationForecastEntityDescription(
         key="next",
-        name="Next Precipitation",
+        name="Nächster Niederschlag",
         device_class=SensorDeviceClass.TIMESTAMP,
     ),
     DwdPrecipitationForecastEntityDescription(
         key="15min",
-        name="Precipitation in next 15min",
+        name="Niederschlag in den nächsten 15 Minuten",
     ),
     DwdPrecipitationForecastEntityDescription(
         key="30min",
-        name="Precipitation in next 30min",
+        name="Niederschlag in den nächsten 30 Minuten",
     ),
     DwdPrecipitationForecastEntityDescription(
         key="60min",
-        name="Precipitation in next 60min",
+        name="Niederschlag in den nächsten 60 Minuten",
     ),
 )
 
@@ -70,12 +71,13 @@ async def async_setup_entry(
         DwdPrecipitationForecastEntity(coordinator, entry, description)
         for description in SENSORS
     )
+    async_add_entities([DwdPrecipitationTypeSensor(coordinator.type_coordinator, entry)])
 
 
 class DwdPrecipitationForecastEntity(
     CoordinatorEntity[DwdPrecipitationForecastCoordinator], SensorEntity
 ):
-    _attr_attribution = "Data provided by DWD"
+    _attr_attribution = "Datenquelle: Deutscher Wetterdienst (DWD), CC BY 4.0; für Home Assistant aufbereitet"
     _attr_has_entity_name = True
 
     def __init__(
@@ -96,7 +98,7 @@ class DwdPrecipitationForecastEntity(
 
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.data.get(CONF_LATITUDE), entry.data.get(CONF_LONGITUDE))},
-            name=f"DWD Precipitation Forecast {entry.title}",
+            name=f"DWD Niederschlagsvorhersage {entry.title}",
             entry_type=DeviceEntryType.SERVICE,
         )
 
@@ -140,7 +142,7 @@ class DwdPrecipitationForecastEntity(
                     if next_precipitation["length"] is not None
                     else None,
                 }
-        except NotInAreaError:
+        except (NotInAreaError, RadarNotAvailableError):
             return {}
 
     @property
@@ -191,5 +193,78 @@ class DwdPrecipitationForecastEntity(
                     self.entry.data.get(CONF_LONGITUDE),
                     datetime.now(UTC),
                 )
+        except (NotInAreaError, RadarNotAvailableError):
+            return None
+
+    @property
+    def available(self):
+        if not super().available:
+            return False
+        try:
+            self.coordinator.api.get_precipitation_values(
+                self.entry.data[CONF_LATITUDE], self.entry.data[CONF_LONGITUDE]
+            )
+            return True
+        except (NotInAreaError, RadarNotAvailableError):
+            return False
+
+
+class DwdPrecipitationTypeSensor(CoordinatorEntity, SensorEntity):
+    """Aktuelle Art in Bodennähe, ausdrücklich keine Artenvorhersage."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Niederschlagsart"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(PRECIPITATION_TYPES.values())
+    _attr_attribution = DwdPrecipitationForecastEntity._attr_attribution
+    _attr_icon = "mdi:weather-partly-rainy"
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator)
+        self.entry = entry
+        self._attr_unique_id = f"{entry.data[CONF_LATITUDE]}-{entry.data[CONF_LONGITUDE]}--precipitation_type"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.data[CONF_LATITUDE], entry.data[CONF_LONGITUDE])},
+            name=f"DWD Niederschlagsvorhersage {entry.title}",
+            entry_type=DeviceEntryType.SERVICE,
+        )
+
+    def _code(self):
+        try:
+            return self.coordinator.api.code_at(self.entry.data[CONF_LATITUDE], self.entry.data[CONF_LONGITUDE])
         except NotInAreaError:
             return None
+
+    @property
+    def available(self):
+        return super().available and self.coordinator.api.fresh() and self._code() is not None
+
+    @property
+    def native_value(self):
+        return PRECIPITATION_TYPES.get(self._code()) if self.available else None
+
+    @property
+    def extra_state_attributes(self):
+        api = self.coordinator.api
+        return {
+            "datenstand": api.timestamp.isoformat() if api.timestamp else None,
+            "produkt": "HymecNG",
+            "klassencode": self._code(),
+            "aufloesung": "1 km",
+            "ist_vorhersage": False,
+        }
+
+    @property
+    def icon(self):
+        code = self._code()
+        if code in (7, 8):
+            return "mdi:weather-snowy"
+        if code == 6:
+            return "mdi:weather-snowy-rainy"
+        if code in (9, 10):
+            return "mdi:weather-hail"
+        if code in (4, 5):
+            return "mdi:snowflake-alert"
+        if code in (2, 3):
+            return "mdi:weather-rainy"
+        return "mdi:weather-partly-rainy"

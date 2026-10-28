@@ -1,6 +1,6 @@
 # DWD-Niederschlagsvorhersage – deutscher Fork
 
-Privater Fork von [stoppegp/ha-dwd-precipitation-forecast](https://github.com/stoppegp/ha-dwd-precipitation-forecast) für Home Assistant. Ziel ist eine deutschsprachige Fassung mit ergänzender Erkennung der aktuellen Niederschlagsart.
+Privater Fork von [stoppegp/ha-dwd-precipitation-forecast](https://github.com/stoppegp/ha-dwd-precipitation-forecast) für Home Assistant. Deutschsprachige Fassung mit zusätzlicher Erkennung der aktuellen Niederschlagsart.
 
 **Unabhängiges Projekt, keine offizielle Integration des Deutschen Wetterdienstes.**
 
@@ -15,11 +15,15 @@ Die vorhandene Integration liefert für einen Standort innerhalb des deutschen D
 
 Die Integration ruft die RV-Radardaten alle fünf Minuten ab. Datenbereitstellung und Übertragung können zu zeitlichem Versatz führen. Die Daten sind räumliche Radarschätzungen und keine Messung unmittelbar am Haus.
 
-**Dieser erste Änderungsstand überarbeitet nur Dokumentation und Lizenzhinweise.** Die Einrichtung und Sensornamen sind noch nicht vollständig eingedeutscht. RV liefert Niederschlagsmengen, keine Unterscheidung zwischen Regen, Schnee und Schneeregen.
+Ab Version **0.3.0** sind Einrichtung, Standardnamen und neue Zustände deutschsprachig. Bestehende Entitäts-IDs und eindeutige Kennungen bleiben erhalten. Eigene Namen in Home Assistant werden nicht überschrieben. RV liefert Niederschlagsmengen; die aktuelle Niederschlagsart kommt separat aus HymecNG.
 
-## Geplante Erweiterung
+## Aktuelle Niederschlagsart (HymecNG)
 
-Die aktuelle Niederschlagsart soll zusätzlich aus dem DWD-Produkt **HymecNG** ausgelesen werden, beispielsweise Regen, Schnee, Schneeregen, gefrierender Regen oder Hagel. Diese Erweiterung ist noch nicht implementiert. HymecNG beschreibt die aktuelle Niederschlagsart; daraus allein ergibt sich keine Vorhersage der Niederschlagsart für die nächsten zwei Stunden.
+Der zusätzliche Sensor **Niederschlagsart** liest das DWD-Produkt **HymecNG** alle fünf Minuten aus. Er unterscheidet keinen Niederschlag, nicht klassifizierbaren Niederschlag, Sprühregen, Regen, gefrierenden Sprühregen, gefrierenden Regen, Schneeregen, Schnee, Graupel, Hagel und großen Hagel. Das Symbol passt sich der Art an.
+
+Der Sensor enthält den Datenstand, den normalisierten Klassencode und die Kennzeichnung `ist_vorhersage: false`. Die Auflösung beträgt 1 × 1 km. Fehlende Daten, Abruffehler und ein mehr als 20 Minuten alter Datenstand werden als nicht verfügbar behandelt. Nicht klassifizierbarer Niederschlag bleibt als solcher erkennbar. Die RV-Vorhersage und HymecNG werden unabhängig abgerufen: Ein HymecNG-Ausfall schaltet die RV-Sensoren nicht ab.
+
+**HymecNG beschreibt die aktuelle Niederschlagsart, nicht die Art zukünftigen Niederschlags.** Ein Schneewert darf deshalb nicht pauschal auf die nächsten zwei Stunden übertragen werden. Die vorhandene Dashboard-Karte wird durch ein Integrationsupdate nicht automatisch geändert.
 
 ## Installation zum privaten Test
 
@@ -27,14 +31,14 @@ Der Fork wird nicht im HACS-Standardkatalog oder einem Marketplace veröffentlic
 
 ### Vorhandene Installation
 
-Der technische Integrationsname lautet weiterhin `dwd_precipitation_forecast`. Original und Fork können deshalb nicht parallel unter diesem Namen installiert werden. Vor einem Wechsel die bestehende Installation und die Home-Assistant-Konfiguration sichern. Ein Austausch sollte erst nach Prüfung des jeweiligen Entwicklungsstands erfolgen.
+Der technische Integrationsname lautet weiterhin `dwd_precipitation_forecast`. Original und Fork können deshalb nicht parallel unter diesem Namen installiert werden. Vor einem Wechsel die bestehende Installation und die Home-Assistant-Konfiguration sichern. In HACS darf danach nicht das Original-Repository über diesen Fork aktualisiert werden. Ein Austausch sollte erst nach Prüfung des jeweiligen Entwicklungsstands erfolgen.
 
 ### Manuelle Installation
 
 1. Den gewünschten Stand dieses Repositorys als ZIP herunterladen.
 2. Den Ordner `custom_components/dwd_precipitation_forecast` in den Ordner `custom_components` der Home-Assistant-Konfiguration kopieren.
 3. Home Assistant neu starten.
-4. Falls noch nicht eingerichtet: unter „Einstellungen → Geräte & Dienste“ die Integration „DWD Precipitation Forecast“ hinzufügen und Standortname, Breitengrad und Längengrad eingeben.
+4. Falls noch nicht eingerichtet: unter „Einstellungen → Geräte & Dienste“ die Integration „DWD Niederschlagsvorhersage“ hinzufügen und Standortname, Breitengrad und Längengrad eingeben.
 
 ### Optional über HACS
 
@@ -99,6 +103,14 @@ card_mod:
       background-image: linear-gradient(90deg{% set entity = entity %}{% set duration = state_attr(entity, 'forecast').keys() | last | as_timestamp - now() | as_timestamp %}{% set hue_min = 200 %}{% set hue_max = 300 %}{% set prec_max = 20 %}{% for x, y in state_attr(entity, 'forecast').items() %}{% set pos = ((x | as_timestamp - (now() | as_timestamp))/duration*100) | round %}{% set hsl_h = (y/prec_max*(hue_max-hue_min)+hue_min)|round %}{% set hsl_l = 50 if y > 0 else 100 %}{% set hsl_alpha = 0.5 if y > 0 else 0 %}{% if pos >= -4 %}, hsla({{hsl_h}}, 100%, {{hsl_l}}%, {{hsl_alpha}}) {{ max(pos,0) }}%{% endif %}{% endfor %});
     }
 ```
+
+## Technische Änderungen in 0.3.0
+
+- DWD-HDF5-Projektion statt der alten sphärischen Standortformel; dadurch kann die gewählte Rasterzelle gegenüber dem Original abweichen.
+- Skalierung und Offset aus dem RV-Dateiheader; fehlende Werte werden nicht als Niederschlag ausgegeben.
+- Prüfung vollständiger RV-Zeitreihen und veralteter Daten; HTTP-Zeitlimits.
+- Zusätzliche Abhängigkeit `pyproj` zur Koordinatenumrechnung. Die erforderlichen Pakete werden von Home Assistant installiert; ein Neustart ist nach dem Austausch notwendig.
+- Die bestehenden Prognoseattribute und die Zustände der 15-/30-/60-Minuten-Sensoren bleiben für bestehende Dashboards kompatibel.
 
 ## Herkunft und Lizenzen
 

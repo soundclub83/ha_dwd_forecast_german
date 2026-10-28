@@ -1,19 +1,24 @@
 {
   "domain": "dwd_precipitation_forecast",
-  "name": "DWD Precipitation Forecast",
+  "name": "DWD Niederschlagsvorhersage",
   "codeowners": [
-    "@stoppegp"
+    "@soundclub83"
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/stoppegp/ha-dwd-precipitation-forecast",
+  "documentation": "https://github.com/soundclub83/ha_dwd_forecast_german",
   "homekit": {},
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/stoppegp/ha-dwd-precipitation-forecast/issues",
-  "requirements": ["h5py~=3.16.0"],
+  "issue_tracker": "https://github.com/soundclub83/ha_dwd_forecast_german/issues",
+  "requirements": [
+    "h5py~=3.16.0",
+    "pyproj~=3.8.0"
+  ],
   "ssdp": [],
-  "version": "0.2.1",
+  "version": "0.3.0",
   "zeroconf": [],
-  "loggers": ["custom_components.dwd_precipitation_forecast"]
+  "loggers": [
+    "custom_components.dwd_precipitation_forecast"
+  ]
 }

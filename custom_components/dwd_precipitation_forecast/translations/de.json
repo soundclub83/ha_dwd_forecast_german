@@ -3,13 +3,18 @@
   "config": {
     "step": {
       "user": {
-        "title": "Ort wählen",
+        "title": "Standort wählen",
+        "description": "Zweistündige Radarvorhersage und aktuelle Niederschlagsart für deinen Standort. Datenquelle: DWD Open Data (CC BY 4.0).",
         "data": {
-          "name": "Ortsname",
+          "name": "Standortname",
           "latitude": "Breitengrad",
           "longitude": "Längengrad"
         }
       }
+    },
+    "error": {
+      "unknown": "Die Einrichtung ist fehlgeschlagen. Bitte prüfe die Angaben.",
+      "invalid_coordinates": "Bitte gültige Koordinaten und einen Standortnamen eingeben."
     }
   }
 }

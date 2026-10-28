@@ -1,6 +1,5 @@
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
-import math
 import tarfile
 import re
 
@@ -11,11 +10,9 @@ import h5py
 
 API_URL = "https://opendata.dwd.de/weather/radar/composite/rv/composite_rv_LATEST.tar"
 
+from .radar_grid import NotInAreaError, RadarGrid, text
+
 _LOGGER = logging.getLogger(__name__)
-
-
-class NotInAreaError(Exception):
-    pass
 
 
 class RadarNotAvailableError(Exception):
@@ -25,62 +22,66 @@ class RadarNotAvailableError(Exception):
 class DWDRadar:
     def __init__(self):
         self.radars = None
+        self.grid = None
         self.xsize = 1100
         self.ysize = 1200
 
     def get_radars(self):
-        _LOGGER.info("get radars")
+        response = requests.get(API_URL, timeout=(5, 30))
+        response.raise_for_status()
         radars = {}
-        r = requests.get(API_URL)
-        _LOGGER.info(r)
-        tar = tarfile.open(fileobj=BytesIO(r.content))
-        _LOGGER.info(tar)
-        for tarmember in tar.getmembers():
-            m = re.search(r"(\d{3})-hd5", tarmember.name)
-            radar_minute_delta = int(m.group(1))
-            m = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})", tarmember.name)
-            radar_time = datetime(year=int(m.group(1)), month=int(m.group(2)), day=int(m.group(3)), hour=int(m.group(4)), minute=int(m.group(5))).replace(tzinfo=UTC) + timedelta(minutes=radar_minute_delta)
-            f = tar.extractfile(tarmember)
-            #radars[radar_time] = np.frombuffer(content, dtype="uint16").reshape(
-            #    self.ysize, self.xsize)
-            hdf = h5py.File(f, 'r')
+        grid = None
+        calibration = {}
+        with tarfile.open(fileobj=BytesIO(response.content)) as archive:
+            for member in archive.getmembers():
+                match = re.fullmatch(r"composite_rv_(\d{8}_\d{4})_(\d{3})-hd5", member.name)
+                if not member.isfile() or match is None:
+                    continue
+                base = datetime.strptime(match[1], "%Y%m%d_%H%M").replace(tzinfo=UTC)
+                radar_time = base + timedelta(minutes=int(match[2]))
+                with archive.extractfile(member) as stream:
+                    with h5py.File(BytesIO(stream.read()), "r") as hdf:
+                        current_grid = RadarGrid.from_hdf(hdf)
+                        if grid is not None and current_grid != grid:
+                            raise ValueError("RV-Raster sind uneinheitlich")
+                        grid = current_grid
+                        meta = hdf["dataset1/data1/what"].attrs
+                        if text(meta["quantity"]) != "ACRR":
+                            raise ValueError("Unerwartetes RV-Datenformat")
+                        raw = hdf["dataset1/data1/data"][:]
+                        if raw.shape != (grid.ysize, grid.xsize):
+                            raise ValueError("RV-Rastergröße stimmt nicht")
+                        calibration[radar_time] = {
+                            key: float(meta[key]) for key in ("gain", "offset", "nodata", "undetect")
+                        }
+                        radars[radar_time] = raw
+        times = sorted(radars)
+        if len(times) != 25 or any(b - a != timedelta(minutes=5) for a, b in zip(times, times[1:])):
+            raise ValueError("Unvollständige RV-Vorhersage")
+        age = datetime.now(UTC) - times[0]
+        if not -timedelta(minutes=2) <= age <= timedelta(minutes=20):
+            raise ValueError("RV-Datenstand ist veraltet oder liegt in der Zukunft")
+        self.radars = dict(sorted(radars.items()))
+        self.grid = grid
+        self.calibration = calibration
+        self.xsize, self.ysize = grid.xsize, grid.ysize
 
-            radars[radar_time] = hdf['dataset1']['data1']['data'][:]
-            hdf.close()
-        self.radars = radars
-        _LOGGER.info("got radars")
-
-    def get_location_index(self, x, y):
-        if self.radars is None:
+    def get_location_index(self, latitude, longitude):
+        if self.radars is None or self.grid is None:
             raise RadarNotAvailableError
-        x_cart = int(
-            6370.04
-            * (1 + math.sin(60 / 180 * math.pi))
-            / (1 + math.sin(x / 180 * math.pi))
-            * math.cos(x / 180 * math.pi)
-            * math.sin((y - 10) / 180 * math.pi)
-            + 543.4622
-        )
-        y_cart = self.ysize - int(
-            -6370.04
-            * (1 + math.sin(60 / 180 * math.pi))
-            / (1 + math.sin(x / 180 * math.pi))
-            * math.cos(x / 180 * math.pi)
-            * math.cos((y - 10) / 180 * math.pi)
-            + 4808.645
-        )
-        if not (0 <= y_cart < self.ysize) or not (0 <= x_cart < self.xsize):
-            raise NotInAreaError
-        return (x_cart, y_cart)
+        return self.grid.index(latitude, longitude)
 
-    def get_precipitation_values(self, x, y):
-        x_cart, y_cart = self.get_location_index(x, y)
-        if self.radars is None:
-            self.get_radars()
+    def get_precipitation_values(self, latitude, longitude):
+        column, row = self.get_location_index(latitude, longitude)
         values = {}
-        for radar_time, radar in self.radars.items():
-            value_raw = radar[y_cart][x_cart]
-            values[radar_time] = int(value_raw) / 1000 * 12
+        for stamp, radar in self.radars.items():
+            raw = float(radar[row, column])
+            meta = self.calibration[stamp]
+            if raw == meta["nodata"] or not np.isfinite(raw):
+                raise RadarNotAvailableError("Am Standort fehlen RV-Daten")
+            values[stamp] = 0.0 if raw == meta["undetect"] else max(
+                0.0, raw * meta["gain"] + meta["offset"]
+            ) * 12
         return values
 
     def get_value(self, x, y, search_time: datetime):
@@ -90,14 +91,6 @@ class DWDRadar:
             [x.timestamp() for x in precipitation_values],
             list(precipitation_values.values()),
         )
-        current_value = None
-        for radar_time, precipitation in precipitation_values.items():
-            if radar_time <= datetime.now(UTC):
-                current_value = precipitation
-            else:
-                break
-        return current_value
-
     def get_next_precipitation(self, x, y):
         rain_start = None
         rain_end = None

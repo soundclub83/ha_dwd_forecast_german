@@ -8,6 +8,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import DOMAIN
 from .dwdradar import DWDRadar
+from .hymec import HymecData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,4 +50,20 @@ class DwdPrecipitationForecastCoordinator(DataUpdateCoordinator):
                 # data retrieved from API.
                 return await self.hass.async_add_executor_job(self.api.get_radars)
         except Exception as err:
-            raise UpdateFailed(f"This Error communicating with API: {err}")
+            raise UpdateFailed(f"DWD-Radardaten konnten nicht geladen werden: {err}") from err
+
+
+class DwdPrecipitationTypeCoordinator(DataUpdateCoordinator):
+    """Eigener Abruf: Fehler bei HymecNG beeinträchtigen die RV-Prognose nicht."""
+
+    def __init__(self, hass):
+        super().__init__(hass, _LOGGER, name=f"{DOMAIN}_niederschlagsart",
+                         update_interval=timedelta(minutes=5))
+        self.api = HymecData()
+
+    async def _async_update_data(self):
+        try:
+            async with async_timeout.timeout(50):
+                await self.hass.async_add_executor_job(self.api.update)
+        except Exception as err:
+            raise UpdateFailed(f"DWD-Niederschlagsart konnte nicht geladen werden: {err}") from err
